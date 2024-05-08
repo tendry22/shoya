@@ -19,13 +19,32 @@ import Axios from 'axios';
 import { BASE_URL } from "../../../config";
 import { useNavigation } from "@react-navigation/native";
 import { ToastAndroid } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Ajout de l'import AsyncStorage
 
 import * as LocalAuthentication from "expo-local-authentication";
+import { schedulePushNotification, sendPushNotification } from './notificationsUtils';
+import { getExpoPushTokenAsync } from 'expo-notifications';
 
 const AdminSkrill = () => {
   const navigation = useNavigation();
   
   const [listeAirtm, setListeAirtm] = useState([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const projectId = 'da434518-0960-451b-834b-0a20a9ec1e31'; // Votre projet ID
+        const token = (await getExpoPushTokenAsync({ projectId })).data;
+        console.log('Expo Push Token:', token);
+        await AsyncStorage.setItem('adminExpoToken', token);
+        console.log('Jeton Expo de l\'administrateur stocké avec succès.');
+  
+        await sendPushNotification(token, 'Aucun Transaction', 'Personne n`a fait de transaction');
+      } catch (error) {
+        console.error('Erreur lors du stockage du jeton Expo de l\'administrateur :', error);
+      }
+    })();
+  }, []);
 
   const handleSubmit = async (idtransaction) => {
     try {
@@ -85,13 +104,50 @@ const AdminSkrill = () => {
     const fetchAirtm = async () => {
       try {
         const response = await Axios.get(`${BASE_URL}/skrill/pending`);
-        setListeAirtm(response.data);
+        const newData = response.data;
+        
+        // Vérifier si de nouvelles données sont disponibles
+        if (!areArraysEqual(newData, listeAirtm)) {
+          setListeAirtm(newData);
+          
+          // Effectuer d'autres actions si nécessaire
+          const adminExpoToken = await AsyncStorage.getItem('adminExpoToken');
+          if (adminExpoToken) {
+            await sendPushNotification(adminExpoToken, "Une transaction en attente", "Une transaction est en attente de validation.");
+          } else {
+            console.error('Jeton Expo de l\'administrateur non trouvé ou invalide.');
+          }
+        }
       } catch (error) {
         console.log(error.response.data);
       }
     };
+  
+    // Appeler fetchAirtm une fois au montage du composant
     fetchAirtm();
-  }, []);
+  
+    // Définir un intervalle pour appeler fetchAirtm périodiquement
+    const intervalId = setInterval(fetchAirtm, 15000); // Par exemple, toutes les 5 secondes
+  
+    // Nettoyer l'intervalle lors du démontage du composant
+    return () => clearInterval(intervalId);
+  }, []); // Nous n'avons pas de dépendances ici car nous ne voulons pas que cette fonction useEffect soit appelée à nouveau après le premier rendu
+  
+  // Fonction utilitaire pour comparer deux tableaux
+  const areArraysEqual = (array1, array2) => {
+    if (array1.length !== array2.length) {
+      return false;
+    }
+  
+    for (let i = 0; i < array1.length; i++) {
+      if (array1[i] !== array2[i]) {
+        return false;
+      }
+    }
+  
+    return true;
+  };
+  
 
   return (
     <ImageBackground
@@ -223,4 +279,5 @@ const styles = StyleSheet.create({
     borderRadius: 30,
   },
 });
+
 export default AdminSkrill;
