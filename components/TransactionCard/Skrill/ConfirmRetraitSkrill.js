@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useRef } from "react";
-import { ImageBackground, View, TouchableOpacity, StyleSheet, Text, Modal, ToastAndroid } from "react-native";
+import React, { useState, useEffect } from "react";
+import { ImageBackground, View, TouchableOpacity, StyleSheet, Text, ToastAndroid } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { FontAwesome } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Axios from 'axios';
 import { BASE_URL } from '../../../config';
-import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import BackNavs from "../../Navs/BackNavs";
-import logoImage from '../../../assets/logobtn.png';
+import { schedulePushNotification, sendPushNotification } from './notificationsUtils';
+import { getExpoPushTokenAsync } from 'expo-notifications';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -23,32 +23,22 @@ const ConfirmRetraitSkrill = ({ route }) => {
   const navigation = useNavigation();
 
   const adresseShoya = process.env.EXPO_PUBLIC_SHOYA_ADRESS_SKRILL;
-  const [expoPushToken, setExpoPushToken] = useState('');
-  const [notification, setNotification] = useState(false);
-  const [showAlert, setShowAlert] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const notificationListener = useRef();
-  const responseListener = useRef();
 
   useEffect(() => {
-    registerForPushNotificationsAsync().then(token => setExpoPushToken(token));
-
-    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-      setNotification(notification);
-      setShowAlert(true);
-      setTimeout(() => {
-        setShowAlert(false);
-      }, 5000);
-    });
-
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log(response);
-    });
-
-    return () => {
-      Notifications.removeNotificationSubscription(notificationListener.current);
-      Notifications.removeNotificationSubscription(responseListener.current);
-    };
+    (async () => {
+      try {
+        const projectId = 'da434518-0960-451b-834b-0a20a9ec1e31'; // Votre projet ID
+        const token = (await getExpoPushTokenAsync({ projectId })).data;
+        console.log('Expo Push Token:', token);
+        await AsyncStorage.setItem('adminExpoToken', token);
+        console.log('Jeton Expo de l\'administrateur stocké avec succès.');
+  
+        await sendPushNotification(token, 'Une transaction en attente', 'Une transaction est en attente de validation.');
+      } catch (error) {
+        console.error('Erreur lors du stockage du jeton Expo de l\'administrateur :', error);
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -59,93 +49,6 @@ const ConfirmRetraitSkrill = ({ route }) => {
     return () => clearInterval(interval);
   }, []);
 
-  async function schedulePushNotification() {
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "Transaction en cours !",
-        body: `Votre transaction de ${montant} USD a été en cours de vérification.`,
-        data: { type: 'transaction', montant: montant },
-      },
-      trigger: { seconds: 2 },
-    });
-  }
-
-  async function sendPushNotificationToAdmin() {
-    try {
-      const adminExpoToken = await AsyncStorage.getItem('adminExpoToken');
-
-      if (adminExpoToken) {
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            to: adminExpoToken,
-            title: "Une transaction en attente",
-            body: "Une transaction est en attente de validation.",
-          },
-          trigger: null
-        });
-        console.log('Notification envoyée à l\'administrateur avec succès.');
-      } else {
-        console.error('Jeton Expo de l\'administrateur non trouvé ou invalide.');
-      }
-    } catch (error) {
-      console.error('Erreur lors de l\'envoi de la notification à l\'administrateur :', error);
-    }
-  }
-  
-  async function getAdminExpoToken() {
-    try {
-      const adminUserId = await AsyncStorage.getItem('adminUserId');
-  
-      if (adminUserId) {
-        const token = (await Notifications.getExpoPushTokenAsync({ userId: adminUserId })).data;
-        console.log('Jeton Expo de l\'administrateur:', token);
-        return token;
-      } else {
-        console.error('Impossible de récupérer le jeton Expo de l\'administrateur: ID d\'utilisateur non trouvé.');
-        return null;
-      }
-    } catch (error) {
-      console.error('Erreur lors de la récupération du jeton Expo de l\'administrateur:', error);
-      return null;
-    }
-  }
-
-  async function registerForPushNotificationsAsync() {
-    let token;
-
-    if (Device.isDevice) {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
-      if (finalStatus !== 'granted') {
-        console.error('Failed to get push token for push notification!');
-        return;
-      }
-      token = (await Notifications.getExpoPushTokenAsync({ projectId: 'da434518-0960-451b-834b-0a20a9ec1e31' })).data;
-      console.log(token);
-    } else {
-      console.error('Must use physical device for Push Notifications');
-    }
-
-    return token;
-  }
-
-  async function adminLogin() {
-    try {
-      const adminExpoToken = 'ExponentPushToken[ybGE70CBzUE47puF7OOBBp]';
-      await AsyncStorage.setItem('adminExpoToken', adminExpoToken);
-      console.log('Jeton Expo de l\'administrateur stocké avec succès.');
-
-      await sendPushNotificationToAdmin(adminExpoToken, 'Une transaction en attente', 'Une transaction est en attente de validation.');
-    } catch (error) {
-      console.error('Erreur lors du stockage du jeton Expo de l\'administrateur :', error);
-    }
-  }
-  
-  
   const handleSubmit = async () => {
     try {
       let date = new Date();
@@ -169,8 +72,17 @@ const ConfirmRetraitSkrill = ({ route }) => {
           await AsyncStorage.setItem("timeskrill", new Date() + '');
           if (response.data.messageresult == 'transaction skrill effectue, en attente de validation') {
             navigation.navigate("ValidationSkrill", { montant, id });
-            await schedulePushNotification();
-            await sendPushNotificationToAdmin();
+            await schedulePushNotification({
+              title: "Transaction en cours !",
+              body: `Votre transaction de ${montant} USD a été en cours de vérification.`,
+              data: { type: 'transaction', montant: montant },
+            }, { seconds: 2 });
+            const adminExpoToken = await AsyncStorage.getItem('adminExpoToken');
+            if (adminExpoToken) {
+              await sendPushNotification(adminExpoToken, "Une transaction en attente", "Une transaction est en attente de validation.");
+            } else {
+              console.error('Jeton Expo de l\'administrateur non trouvé ou invalide.');
+            }
           } else {
             ToastAndroid.show(
               response.data.messageresult,
@@ -185,10 +97,6 @@ const ConfirmRetraitSkrill = ({ route }) => {
       console.error('Erreur lors de la requête Axios :', error);
     }
   };
-
-  useEffect(() => {
-    adminLogin();
-  }, []);
 
   return (
     <ImageBackground
