@@ -20,10 +20,18 @@ import { BASE_URL } from "../../../config";
 import { useNavigation } from "@react-navigation/native";
 import { ToastAndroid } from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Ajout de l'import AsyncStorage
-
+import * as Notifications from 'expo-notifications';
 import * as LocalAuthentication from "expo-local-authentication";
-import { schedulePushNotification, sendPushNotification } from './notificationsUtils';
+import { schedulePushNotification, sendPushNotification } from '../notificationsUtils';
 import { getExpoPushTokenAsync } from 'expo-notifications';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 const AdminSkrill = () => {
   const navigation = useNavigation();
@@ -39,7 +47,7 @@ const AdminSkrill = () => {
         await AsyncStorage.setItem('adminExpoToken', token);
         console.log('Jeton Expo de l\'administrateur stocké avec succès.');
   
-        await sendPushNotification(token, 'Aucun Transaction', 'Personne n`a fait de transaction');
+        await sendPushNotification(token, 'Skrill :Aucun Transaction', 'Personne n`a fait de transaction Skrill');
       } catch (error) {
         console.error('Erreur lors du stockage du jeton Expo de l\'administrateur :', error);
       }
@@ -113,7 +121,13 @@ const AdminSkrill = () => {
           // Effectuer d'autres actions si nécessaire
           const adminExpoToken = await AsyncStorage.getItem('adminExpoToken');
           if (adminExpoToken) {
-            await sendPushNotification(adminExpoToken, "Une transaction en attente", "Une transaction est en attente de validation.");
+            //await sendPushNotification(adminExpoToken, "Une transaction en attente", "Une transaction est en attente de validation.");
+            await sendPushNotification({
+              adminExpoToken,
+              title: "Skrill :Une transaction en attente",
+              body: `Une transaction est en attente de validation Skrill.`,
+              data: { type: 'transaction'},
+            }, { seconds: 1 });
           } else {
             console.error('Jeton Expo de l\'administrateur non trouvé ou invalide.');
           }
@@ -123,17 +137,11 @@ const AdminSkrill = () => {
       }
     };
   
-    // Appeler fetchAirtm une fois au montage du composant
     fetchAirtm();
-  
-    // Définir un intervalle pour appeler fetchAirtm périodiquement
-    const intervalId = setInterval(fetchAirtm, 15000); // Par exemple, toutes les 5 secondes
-  
-    // Nettoyer l'intervalle lors du démontage du composant
+    const intervalId = setInterval(fetchAirtm, 15000);
+
     return () => clearInterval(intervalId);
-  }, []); // Nous n'avons pas de dépendances ici car nous ne voulons pas que cette fonction useEffect soit appelée à nouveau après le premier rendu
-  
-  // Fonction utilitaire pour comparer deux tableaux
+  }, []); 
   const areArraysEqual = (array1, array2) => {
     if (array1.length !== array2.length) {
       return false;

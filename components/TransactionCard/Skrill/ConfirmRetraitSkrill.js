@@ -7,7 +7,7 @@ import Axios from 'axios';
 import { BASE_URL } from '../../../config';
 import * as Notifications from 'expo-notifications';
 import BackNavs from "../../Navs/BackNavs";
-import { schedulePushNotification, sendPushNotification } from './notificationsUtils';
+import { schedulePushNotification, sendPushNotification } from '../notificationsUtils';
 import { getExpoPushTokenAsync } from 'expo-notifications';
 
 Notifications.setNotificationHandler({
@@ -34,7 +34,7 @@ const ConfirmRetraitSkrill = ({ route }) => {
         await AsyncStorage.setItem('adminExpoToken', token);
         console.log('Jeton Expo de l\'administrateur stocké avec succès.');
   
-        await sendPushNotification(token, 'Une transaction en attente', 'Une transaction est en attente de validation.');
+        //await sendPushNotification(token, 'Une transaction en attente', 'Une transaction est en attente de validation.');
       } catch (error) {
         console.error('Erreur lors du stockage du jeton Expo de l\'administrateur :', error);
       }
@@ -77,12 +77,12 @@ const ConfirmRetraitSkrill = ({ route }) => {
               body: `Votre transaction de ${montant} USD a été en cours de vérification.`,
               data: { type: 'transaction', montant: montant },
             }, { seconds: 2 });
-            const adminExpoToken = await AsyncStorage.getItem('adminExpoToken');
-            if (adminExpoToken) {
-              await sendPushNotification(adminExpoToken, "Une transaction en attente", "Une transaction est en attente de validation.");
-            } else {
-              console.error('Jeton Expo de l\'administrateur non trouvé ou invalide.');
-            }
+            // const adminExpoToken = await AsyncStorage.getItem('adminExpoToken');
+            // if (adminExpoToken) {
+            //   await sendPushNotification(adminExpoToken, "Une transaction en attente", "Une transaction est en attente de validation.");
+            // } else {
+            //   console.error('Jeton Expo de l\'administrateur non trouvé ou invalide.');
+            // }
           } else {
             ToastAndroid.show(
               response.data.messageresult,

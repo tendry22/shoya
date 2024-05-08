@@ -17,6 +17,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BASE_URL } from "../../../config";
 import Axios from 'axios';
 import { ToastAndroid } from "react-native";
+import * as Notifications from 'expo-notifications';
+import { schedulePushNotification, sendPushNotification } from '../notificationsUtils';
+import { getExpoPushTokenAsync } from 'expo-notifications';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 const ConfirmRetraitAirtm = ({ route }) => {
   const { montant } = route.params;
@@ -25,6 +36,22 @@ const ConfirmRetraitAirtm = ({ route }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   const adresseShoya = process.env.EXPO_PUBLIC_SHOYA_ADRESS_AIRTM;
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const projectId = 'da434518-0960-451b-834b-0a20a9ec1e31'; // Votre projet ID
+        const token = (await getExpoPushTokenAsync({ projectId })).data;
+        console.log('Expo Push Token:', token);
+        await AsyncStorage.setItem('adminExpoToken', token);
+        console.log('Jeton Expo de l\'administrateur stocké avec succès.');
+  
+        //await sendPushNotification(token, 'Une transaction en attente', 'Une transaction est en attente de validation.');
+      } catch (error) {
+        console.error('Erreur lors du stockage du jeton Expo de l\'administrateur :', error);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -77,6 +104,11 @@ const ConfirmRetraitAirtm = ({ route }) => {
           await AsyncStorage.setItem("timeairtm", new Date()+'');
           if(response.data.messageresult == 'transaction airtm effectue, en attente de validation'){
             navigation.navigate("ValidationAirtm", { id, montant });
+            await schedulePushNotification({
+              title: "Transaction en cours !",
+              body: `Votre transaction de ${montant} USD a été en cours de vérification.`,
+              data: { type: 'transaction', montant: montant },
+            }, { seconds: 2 });
           }
           else{
             ToastAndroid.show(
