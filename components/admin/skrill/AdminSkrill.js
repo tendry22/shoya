@@ -121,13 +121,13 @@ const AdminSkrill = () => {
           // Effectuer d'autres actions si nécessaire
           const adminExpoToken = await AsyncStorage.getItem('adminExpoToken');
           if (adminExpoToken) {
-            //await sendPushNotification(adminExpoToken, "Une transaction en attente", "Une transaction est en attente de validation.");
-            await sendPushNotification({
-              adminExpoToken,
-              title: "Skrill :Une transaction en attente",
-              body: `Une transaction est en attente de validation Skrill.`,
-              data: { type: 'transaction'},
-            }, { seconds: 1 });
+            await sendPushNotification(adminExpoToken, "Une transaction en attente", "Une transaction est en attente de validation.");
+            // await sendPushNotification({
+            //   adminExpoToken,
+            //   title: "Skrill :Une transaction en attente",
+            //   body: `Une transaction est en attente de validation Skrill.`,
+            //   data: { type: 'transaction'},
+            // }, { seconds: 1 });
           } else {
             console.error('Jeton Expo de l\'administrateur non trouvé ou invalide.');
           }

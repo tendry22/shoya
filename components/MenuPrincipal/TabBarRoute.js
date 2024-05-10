@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View, Text, Modal } from "react-native";
 import React from "react";
 import { Home, Earn, Games, Settings } from "./screens";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
